@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <title>Recuperarea Investiției - Psiholog</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+      background-color: #f5faff;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      color: #0066cc;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      position: relative;
+    }
+    input {
+      width: 100%;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    canvas {
+      margin-top: 30px;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #e6f4ff;
+      border-left: 5px solid #0066cc;
+    }
+    .info-icon {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      background-color: #0066cc;
+      border-radius: 50%;
+      color: white;
+      text-align: center;
+      font-size: 12px;
+      margin-left: 5px;
+      cursor: help;
+      font-weight: bold;
+      vertical-align: middle;
+    }
+    .explanations {
+      margin-top: 20px;
+      padding: 15px;
+      background: #fffde7;
+      border-left: 5px solid #ffb300;
+    }
+    .detailed-calculation {
+      font-family: monospace;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Calculator Recuperare Investiție - Psiholog</h1>
+
+<label>Facultate (lei):
+  <span class="info-icon" title="Costul total al studiilor universitare">?</span>
+  <input type="number" id="facultate" value="6000">
+</label>
+
+<label>Master (lei):
+  <span class="info-icon" title="Costul total al studiilor de masterat">?</span>
+  <input type="number" id="master" value="10000">
+</label>
+
+<label>Formare post-universitate (lei):
+  <span class="info-icon" title="Cursuri, seminarii, supervizii etc. după facultate">?</span>
+  <input type="number" id="formare" value="30000">
+</label>
+
+<label>Teste psihologice etc. (lei):
+  <span class="info-icon" title="Cheltuieli pe materiale, carnete, licențe etc.">?</span>
+  <input type="number" id="teste" value="5000">
+</label>
+
+<hr>
+
+<label>Tarif per sesiune (lei):
+  <span class="info-icon" title="Venitul tău pe o singură sesiune">?</span>
+  <input type="number" id="tarif" value="100">
+</label>
+
+<label>Durata unei sesiuni (ore):
+  <span class="info-icon" title="Durata medie a unei sesiuni de terapie">?</span>
+  <input type="number" id="durata_sesiune" value="1">
+</label>
+
+<label>Ocupare initiala (%) <small>(ex: 10%)</small>:
+  <span class="info-icon" title="Procent din programul tău ocupat la început">?</span>
+  <input type="number" id="ocupare_initial" value="10">
+</label>
+
+<label>Crestere lunara (%) <small>(ex: 2% = +2% din capacitate)</small>:
+  <span class="info-icon" title="Cu cât crește procentajul din program ocupat lunar">?</span>
+  <input type="number" id="crestere_luna" value="2">
+</label>
+
+<label><input type="checkbox" id="impozit_activ" checked> Scade și impozitul?</label>
+
+<label>Procent impozit (%):
+  <span class="info-icon" title="Impozit aplicat asupra venitului brut">?</span>
+  <input type="number" id="procent_impozit" value="45">
+</label>
+
+<label>Durata simulare (ani):
+  <span class="info-icon" title="Pe câți ani vrei să simulezi veniturile">?</span>
+  <input type="number" id="ani_simulare" value="7">
+</label>
+
+<button onclick="calculeaza()">Calculează</button>
+
+<div class="result" id="rezultat"></div>
+
+<div class="explanations" id="explicatii"></div>
+
+<canvas id="grafic"></canvas>
+
+<script>
+function calculeaza() {
+  // Cheltuieli
+  const facultate = parseFloat(document.getElementById("facultate").value) || 0;
+  const master = parseFloat(document.getElementById("master").value) || 0;
+  const formare = parseFloat(document.getElementById("formare").value) || 0;
+  const teste = parseFloat(document.getElementById("teste").value) || 0;
+
+  // Parametrii venituri
+  const tarif = parseFloat(document.getElementById("tarif").value) || 0;
+  const durataSesiune = parseFloat(document.getElementById("durata_sesiune").value) || 1;
+  const ocupareInitial = parseFloat(document.getElementById("ocupare_initial").value) || 0;
+  const crestereLuna = parseFloat(document.getElementById("crestere_luna").value) || 0;
+  const aniSimulare = parseInt(document.getElementById("ani_simulare").value) || 0;
+
+  // Impozit
+  const impozitActiv = document.getElementById("impozit_activ").checked;
+  const procentImpozit = parseFloat(document.getElementById("procent_impozit").value) || 0;
+
+  // Calcul capacități
+  const oreLuna = 8 * 5 * 4; // 160 ore/luna
+  const sesiuniMaxim = oreLuna / durataSesiune;
+
+  let venitBrutCumulativ = 0;
+  let venitNetCumulativ = 0;
+  let lunaBreakEven = null;
+  let ocupareCurenta = ocupareInitial / 100;
+
+  const lunile = [];
+  const venitBrutPeLuni = [];
+  const venitNetPeLuni = [];
+
+  let luna1 = {}, luna2 = {};
+
+  for (let luna = 1; luna <= aniSimulare * 12; luna++) {
+    const sesiuniLuna = Math.round(sesiuniMaxim * ocupareCurenta);
+    const venitBrutLuna = sesiuniLuna * tarif;
+    const venitNetLuna = impozitActiv ? venitBrutLuna * (1 - procentImpozit / 100) : venitBrutLuna;
+
+    venitBrutCumulativ += venitBrutLuna;
+    venitNetCumulativ += venitNetLuna;
+
+    if (luna === 1) {
+      luna1.ocupare = ocupareCurenta * 100;
+      luna1.sesiuni = sesiuniLuna;
+      luna1.tarif = tarif;
+      luna1.venit_brut = venitBrutLuna;
+      luna1.venit_net = venitNetLuna;
+      luna1.impozit = procentImpozit;
+    } else if (luna === 2) {
+      luna2.ocupare = ocupareCurenta * 100;
+      luna2.sesiuni = sesiuniLuna;
+      luna2.tarif = tarif;
+      luna2.venit_brut = venitBrutLuna;
+      luna2.venit_net = venitNetLuna;
+      luna2.impozit = procentImpozit;
+    }
+
+    if (!lunaBreakEven && venitNetCumulativ >= (facultate + master + formare + teste)) {
+      lunaBreakEven = luna;
+    }
+
+    lunile.push(`Luna ${luna}`);
+    venitBrutPeLuni.push(venitBrutCumulativ);
+    venitNetPeLuni.push(venitNetCumulativ);
+
+    // Crestere ocupare
+    ocupareCurenta += crestereLuna / 100;
+    if (ocupareCurenta > 1) ocupareCurenta = 1;
+  }
+
+  const totalInvestitie = facultate + master + formare + teste;
+  const anBreakEven = Math.ceil(lunaBreakEven / 12);
+  const rezultatDiv = document.getElementById("rezultat");
+
+  if (lunaBreakEven) {
+    rezultatDiv.innerHTML = `
+      <strong>✔️ Ai recuperat investiția (~${totalInvestitie} lei) în jurul lunii ${lunaBreakEven}, adică în anul ${anBreakEven}.</strong>`;
+  } else {
+    rezultatDiv.innerHTML = `<strong>⚠️ Nu ai recuperat investiția în cei ${aniSimulare} ani analizați.</strong>`;
+  }
+
+  // Explicații detaliate
+  const explicatiiDiv = document.getElementById("explicatii");
+  explicatiiDiv.innerHTML = `
+    <strong>Detalii calcul:</strong><br/>
+    <div class="detailed-calculation">
+      🔹 Luna 1:<br/>
+        &nbsp;&nbsp;→ Ocupare: ${luna1.ocupare.toFixed(1)}%<br/>
+        &nbsp;&nbsp;→ Ore disponibile: 160h (8h/zi × 5zile/săpt. × 4săpt.)<br/>
+        &nbsp;&nbsp;→ Durata sesiunii: ${durataSesiune} oră<br/>
+        &nbsp;&nbsp;→ Sesiuni posibile: ~${luna1.sesiuni}<br/>
+        &nbsp;&nbsp;→ Tarif per sesiune: ${luna1.tarif} lei<br/>
+        &nbsp;&nbsp;→ Venit brut lunar: ${luna1.venit_brut} lei<br/>
+        &nbsp;&nbsp;→ Impozit: ${impozitActiv ? `${luna1.impozit}%` : "NU"}<br/>
+        &nbsp;&nbsp;→ Venit net lunar: <strong>${Math.round(luna1.venit_net)} lei</strong><br/><br/>
+
+      🔹 Luna 2:<br/>
+        &nbsp;&nbsp;→ Ocupare: ${luna2.ocupare.toFixed(1)}%<br/>
+        &nbsp;&nbsp;→ Ore disponibile: 160h<br/>
+        &nbsp;&nbsp;→ Durata sesiunii: ${durataSesiune} oră<br/>
+        &nbsp;&nbsp;→ Sesiuni posibile: ~${luna2.sesiuni}<br/>
+        &nbsp;&nbsp;→ Tarif per sesiune: ${luna2.tarif} lei<br/>
+        &nbsp;&nbsp;→ Venit brut lunar: ${luna2.venit_brut} lei<br/>
+        &nbsp;&nbsp;→ Impozit: ${impozitActiv ? `${luna2.impozit}%` : "NU"}<br/>
+        &nbsp;&nbsp;→ Venit net lunar: <strong>${Math.round(luna2.venit_net)} lei</strong><br/><br/>
+
+      Capacitate maximă: <strong>${sesiuniMaxim} sesiuni/lună</strong>
+    </div>
+  `;
+
+  // Grafic
+  const ctx = document.getElementById('grafic').getContext('2d');
+  if (window.myChart) window.myChart.destroy();
+
+  window.myChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: lunile,
+      datasets: [
+        {
+          label: 'Venit brut cumulativ (fără impozit)',
+          data: venitBrutPeLuni,
+          borderColor: '#aaa',
+          backgroundColor: 'rgba(128, 128, 128, 0.1)',
+          fill: false,
+          borderDash: [5, 5]
+        },
+        {
+          label: 'Venit net cumulativ (cu impozit)',
+          data: venitNetPeLuni,
+          borderColor: '#0066cc',
+          backgroundColor: 'rgba(0, 102, 204, 0.1)',
+          fill: true,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Venit (lei)' }
+        },
+        x: {
+          title: { display: true, text: 'Lună' }
+        }
+      }
+    }
+  });
+}
+</script>
+
+</body>
+</html>
